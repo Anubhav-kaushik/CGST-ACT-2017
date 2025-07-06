@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CGST Act, 2017 - Viewer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Merriweather+Sans:wght@700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="overlay"></div>
+
+    <div class="container">
+        <aside id="sidebar">
+            <button id="close-sidebar" title="Close Menu">×</button>
+            <header>
+                <h1>GST Act, 2017</h1>
+                <p>Central Goods and Services Tax Act</p>
+            </header>
+            <nav id="chapter-nav"></nav>
+        </aside>
+
+        <!-- The menu button is now OUTSIDE the main content area -->
+        <button id="menu-toggle" title="Open Menu">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+
+        <main id="content-area">
+            <!-- The button is no longer here, only the content that changes -->
+            <div class="welcome-message">
+                <h2>Interactive CGST Act Viewer</h2>
+                <p>This application provides a clean, user-friendly interface for the Central Goods and Services Tax
+                    Act, 2017.</p>
+                <p>To begin, please expand a chapter from the navigation menu on the left and select a section to view
+                    its complete text.</p>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
