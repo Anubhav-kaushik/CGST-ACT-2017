@@ -9,6 +9,7 @@
     --text-color: #485460;
     --border-color: #dfe4ea;
     --sidebar-text: #a4b0be;
+    --highlight-bg: #fff3a3;
 }
 
 * {
@@ -26,7 +27,6 @@ body {
     overflow: hidden;
 }
 
-/* --- DESKTOP LAYOUT --- */
 .container {
     display: flex;
     width: 100%;
@@ -45,11 +45,92 @@ body {
 
 #content-area {
     flex: 1;
-    padding: 50px;
     height: 100vh;
-    overflow-y: auto;
     background-color: var(--content-panel-bg);
     box-shadow: -5px 0px 15px rgba(0, 0, 0, 0.05);
+    padding: 40px 50px;
+    display: flex;
+    flex-direction: column; 
+}
+
+.search-container {
+    position: relative;
+    margin-bottom: 30px;
+    flex-shrink: 0; 
+}
+
+#search-input {
+    width: 100%;
+    padding: 12px 20px 12px 45px; 
+    font-size: 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background-color: #f9fafb;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#search-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(84, 160, 255, 0.25);
+}
+
+.search-icon {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    fill: #9ca3af;
+}
+
+#section-content {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 15px;
+    margin-right: -15px;
+}
+
+mark.highlight {
+    background-color: var(--highlight-bg);
+    color: inherit;
+    border-radius: 3px;
+    padding: 0 2px;
+}
+
+/* --- NEW: Search Results Container --- */
+#search-results-container {
+    flex: 1;
+    overflow-y: auto;
+    display: none; /* Hidden by default */
+}
+
+.search-result-item {
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.search-result-item:hover {
+    background-color: #f9fafb;
+}
+
+.search-result-item h3 {
+    color: var(--primary-color);
+    margin-bottom: 8px;
+    font-size: 1.1rem;
+}
+
+.search-result-item .snippet {
+    font-size: 0.9rem;
+    color: #7f8c8d;
+    line-height: 1.5;
+}
+
+.search-result-item .snippet mark {
+    font-weight: bold;
 }
 
 /* Hide mobile-only buttons on desktop */
@@ -59,7 +140,6 @@ body {
     display: none;
 }
 
-/* --- SHARED STYLES --- */
 #sidebar header {
     text-align: center;
     margin-bottom: 30px;
@@ -138,7 +218,7 @@ body {
 
 .welcome-message {
     text-align: center;
-    margin-top: 25vh;
+    margin-top: 20vh;
     color: #95a5a6;
 }
 
@@ -148,17 +228,57 @@ body {
     margin-bottom: 20px;
 }
 
-#content-area p {
+#section-content p {
     margin-bottom: 1.2em;
     line-height: 1.8;
 }
 
-#content-area .footnotes {
+#section-content .footnotes {
     margin-top: 50px;
     padding-top: 25px;
     border-top: 2px solid var(--border-color);
     font-size: 0.9em;
     color: #7f8c8d;
+}
+
+/* ============================================= */
+/* ======== SOURCE URL FOOTER STYLES =========== */
+/* ============================================= */
+
+/* The main container for the source link */
+#section-content .source-url {
+    margin-top: 40px; /* Add space from the content above */
+    padding: 15px 20px; /* More balanced padding than the original */
+    background-color: #fdfbf3; /* A soft, non-intrusive yellow */
+    border: 1px solid #eaddc0; /* A border that complements the background */
+    border-radius: 8px;
+    overflow: hidden; /* Important for containing elements */
+}
+
+/* Style the paragraph inside the footer */
+#section-content .source-url p {
+    margin: 0; /* Remove default paragraph margin */
+    font-size: 0.9em;
+    color: var(--text-color); /* Use the main text color for "Source:" */
+    line-height: 1.6;
+}
+
+/* Style the link itself */
+#section-content .source-url a {
+    color: #888; /* A muted grey for the long URL text */
+    text-decoration: none;
+    
+    /* --- CRITICAL FOR LONG URLS --- */
+    /* These properties allow the long link to wrap without overflowing */
+    overflow-wrap: break-word;
+    word-wrap: break-word; /* (legacy) */
+    word-break: break-word;
+}
+
+/* Add a hover effect for interactivity */
+#section-content .source-url a:hover {
+    color: var(--primary-color);
+    text-decoration: underline;
 }
 
 /* ================================================= */
@@ -171,25 +291,21 @@ body {
         left: 0;
         height: 100%;
         width: 320px;
-        /* A good width for mobile sidebars */
         z-index: 1000;
         transform: translateX(-100%);
-        /* Hide it off-screen */
         box-shadow: 5px 0 15px rgba(0, 0, 0, 0.2);
     }
 
     #sidebar.open {
         transform: translateX(0);
-        /* Bring it on-screen */
     }
 
     #content-area {
         width: 100%;
         padding: 20px;
         padding-top: 70px;
-        /* Make space for the hamburger button */
     }
-
+    
     #menu-toggle {
         display: flex;
         flex-direction: column;
@@ -233,6 +349,5 @@ body {
         height: 100%;
         background: rgba(0, 0, 0, 0.5);
         z-index: 999;
-        /* display is toggled by JavaScript */
     }
 }

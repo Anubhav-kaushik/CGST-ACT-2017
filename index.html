@@ -4,12 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CGST Act, 2017 - Viewer</title>
+    <title>CGST Act, 2017</title>
+
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Merriweather+Sans:wght@700&display=swap"
         rel="stylesheet">
+
+    <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -20,13 +24,12 @@
         <aside id="sidebar">
             <button id="close-sidebar" title="Close Menu">×</button>
             <header>
-                <h1>GST Act, 2017</h1>
+                <h1>CGST Act, 2017</h1>
                 <p>Central Goods and Services Tax Act</p>
             </header>
             <nav id="chapter-nav"></nav>
         </aside>
 
-        <!-- The menu button is now OUTSIDE the main content area -->
         <button id="menu-toggle" title="Open Menu">
             <span></span>
             <span></span>
@@ -34,14 +37,25 @@
         </button>
 
         <main id="content-area">
-            <!-- The button is no longer here, only the content that changes -->
-            <div class="welcome-message">
-                <h2>Interactive CGST Act Viewer</h2>
-                <p>This application provides a clean, user-friendly interface for the Central Goods and Services Tax
-                    Act, 2017.</p>
-                <p>To begin, please expand a chapter from the navigation menu on the left and select a section to view
-                    its complete text.</p>
+            <div class="search-container">
+                 <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"/></svg>
+                <input type="search" id="search-input" placeholder="Search across all sections...">
             </div>
+            
+            <!-- This shows the text of a selected section -->
+            <div id="section-content">
+                <div class="welcome-message">
+                    <h2>Interactive CGST Act, 2017</h2>
+                    <p>This application provides a clean, user-friendly interface for the Central Goods and Services Tax Act, 2017.</p>
+                    <p>To begin, please expand a chapter from the navigation menu on the left and select a section to view its complete text.</p>
+                </div>
+            </div>
+            
+            <!-- ============================================= -->
+            <!-- === NEW CONTAINER FOR GLOBAL SEARCH RESULTS === -->
+            <!-- ============================================= -->
+            <div id="search-results-container"></div>
+
         </main>
     </div>
 
