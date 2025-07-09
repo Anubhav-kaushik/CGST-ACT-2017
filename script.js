@@ -1385,187 +1385,297 @@ const gstActData = [
     }
 ];
 
-// A variable to store the HTML of the last viewed content, so we can restore it.
-let lastViewedContent = '';
+let lastViewedContent = ''; // Stores the last viewed section or welcome message HTML
+
+// NEW: A state variable to track if the "All Sections" list is currently displayed.
+let isAllSectionsViewActive = false;
 
 document.addEventListener('DOMContentLoaded', () => {
+
+    //===============================================
+    // 1. DOM ELEMENT SELECTION
+    //===============================================
     const chapterNav = document.getElementById('chapter-nav');
     const sectionContent = document.getElementById('section-content');
     const searchInput = document.getElementById('search-input');
-    const searchResultsContainer = document.getElementById('search-results-container'); // NEW
+    const searchResultsContainer = document.getElementById('search-results-container');
     const sidebar = document.getElementById('sidebar');
     const menuToggle = document.getElementById('menu-toggle');
     const closeSidebar = document.getElementById('close-sidebar');
     const overlay = document.getElementById('overlay');
     
-    // Store the initial welcome message
     lastViewedContent = sectionContent.innerHTML;
 
     if (!gstActData || gstActData.length === 0) {
-        console.error("GST Act data is empty.");
+        console.error("GST Act data is empty or not loaded.");
+        sectionContent.innerHTML = `<div class="welcome-message"><h2>Error</h2><p>Could not load the GST Act data. Please check the console and try again.</p></div>`;
         return;
     }
-
-    buildNavigation(gstActData);
-
-    // --- HELPER FUNCTIONS ---
-    const sanitizeHtmlContent = (htmlString) => {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(htmlString, 'text/html');
-        doc.querySelectorAll('[style]').forEach(el => el.removeAttribute('style'));
-        return doc.body.innerHTML;
-    };
     
-    const stripHtml = (html) => {
-       const doc = new DOMParser().parseFromString(html, 'text/html');
-       return doc.body.textContent || "";
-    };
+    //===============================================
+    // 2. HELPERS, PRE-PROCESSING & CONFIGURATION
+    //===============================================
 
-    const escapeRegExp = (string) => {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    };
+    const STOP_WORDS = new Set([
+        'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he',
+        'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the', 'to', 'was', 'were',
+        'will', 'with', 'under', 'or', 'if', 'not', 'any', 'all', 'such', 'other',
+        'shall', 'section', 'chapter'
+    ]);
+    
+    const factorial = (() => {
+        const cache = { 0: 1, 1: 1 };
+        return function f(n) {
+            if (n < 0) return 0;
+            if (cache[n] !== undefined) return cache[n];
+            cache[n] = n * f(n - 1);
+            return cache[n];
+        };
+    })();
 
-    // --- SEARCH LOGIC ---
+    const cleanText = (text) => text ? text.toLowerCase().replace(/[^\w\s]/g, '') : '';
+    const processQuery = (query) => cleanText(query).split(/\s+/).filter(word => word && !STOP_WORDS.has(word));
+    const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    gstActData.forEach(section => {
+        const doc = new DOMParser().parseFromString(section.html_content, 'text/html');
+        section.textContent = cleanText(doc.body.textContent || "");
+        section.cleanSectionTitle = cleanText(section.section_title);
+        section.cleanChapterTitle = cleanText(section.chapter_title);
+    });
+    console.log("GST Act data pre-processing complete.");
+    
+    //===============================================
+    // 3. ADVANCED SEARCH & SCORING ALGORITHM
+    //===============================================
+
+    function countSequenceOccurrences(text, sequenceWords, isSingleWordQuery) {
+        if (!sequenceWords.length) return 0;
+        let regexString;
+        if (isSingleWordQuery && sequenceWords.length === 1) {
+            regexString = escapeRegExp(sequenceWords[0]);
+        } else {
+            const escapedSequence = sequenceWords.map(escapeRegExp).join('\\s+');
+            regexString = `\\b${escapedSequence}\\b`;
+        }
+        const sequenceRegex = new RegExp(regexString, 'gi');
+        const matches = text.match(sequenceRegex);
+        return matches ? matches.length : 0;
+    }
+
+    function calculateCoreScore(textContent, searchWords, scoringFormula, isSingleWordQuery) {
+        if (!searchWords.length) return 0;
+
+        for (let i = searchWords.length; i > 0; i--) {
+            const currentSequence = searchWords.slice(0, i);
+            const occurrences = countSequenceOccurrences(textContent, currentSequence, isSingleWordQuery);
+            if (occurrences > 0) {
+                const scoreForMatch = scoringFormula(i) * occurrences;
+                const remainingWords = searchWords.slice(i);
+                return scoreForMatch + calculateCoreScore(textContent, remainingWords, scoringFormula, isSingleWordQuery);
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * MODIFIED: This is now the core of the new interaction logic.
+     */
     const handleGlobalSearch = () => {
-        const searchTerm = searchInput.value.trim();
+        const rawSearchTerm = searchInput.value.trim();
 
-        if (searchTerm.length < 3) {
-            // If search is cleared or too short, show the last viewed content
+        if (rawSearchTerm === '') {
+            // If search is cleared, revert to the last viewed content and reset state.
             searchResultsContainer.style.display = 'none';
-            searchResultsContainer.innerHTML = '';
             sectionContent.style.display = 'block';
             sectionContent.innerHTML = lastViewedContent;
+            isAllSectionsViewActive = false; // Reset state
             return;
         }
 
-        // Perform the search
-        const searchRegex = new RegExp(escapeRegExp(searchTerm), 'gi');
-        const matches = gstActData.filter(section => {
-            const textContent = stripHtml(section.html_content);
-            return textContent.match(searchRegex);
+        const searchWords = processQuery(rawSearchTerm);
+        const isSingleWordQuery = searchWords.length === 1;
+
+        // Scoring logic remains the same...
+        let scoredResults = gstActData.map(section => {
+            const contentScore = calculateCoreScore(section.textContent, searchWords, factorial, isSingleWordQuery);
+            const sectionTitleFormula = (n) => Math.pow(n, n - 1) || 1;
+            const sectionTitleScore = calculateCoreScore(section.cleanSectionTitle, searchWords, sectionTitleFormula, isSingleWordQuery);
+            return { section, score: contentScore + sectionTitleScore };
         });
 
-        displaySearchResults(matches, searchTerm, searchRegex);
+        const chapters = {};
+        scoredResults.forEach(result => {
+            const chapNum = result.section.chapter_number;
+            if (!chapters[chapNum]) chapters[chapNum] = { sections: [], chapterData: result.section };
+            chapters[chapNum].sections.push(result);
+        });
+        
+        for (const chapNum in chapters) {
+            const chapter = chapters[chapNum];
+            const chapterTitleFormula = (n) => Math.pow(n, n);
+            const chapterTitleScore = calculateCoreScore(chapter.chapterData.cleanChapterTitle, searchWords, chapterTitleFormula, isSingleWordQuery);
+            if (chapterTitleScore > 0) {
+                chapter.sections.forEach(result => { result.score *= (1 + chapterTitleScore); });
+            }
+        }
+        
+        const finalResults = Object.values(chapters).flatMap(chap => chap.sections)
+            .filter(result => result.score > 0)
+            .sort((a, b) => b.score - a.score);
+
+        // UPDATE: The core logic change is here.
+        if (finalResults.length > 0) {
+            // If we have results, display them. This will switch the view if needed.
+            displaySearchResults(finalResults, rawSearchTerm, searchWords);
+        } else {
+            // If no results are found...
+            if (isAllSectionsViewActive) {
+                // ...and the "All Sections" list is showing, DO NOTHING.
+                // This keeps the list visible while the user types.
+                return;
+            } else if (sectionContent.style.display !== 'none') {
+                // ...and a section is being viewed, DO NOTHING.
+                // This keeps the section visible while the user types.
+                return;
+            } else {
+                // ...and we were already showing search results, now show "No results found".
+                displayNoResultsMessage(rawSearchTerm);
+            }
+        }
     };
 
-    const displaySearchResults = (matches, searchTerm, searchRegex) => {
+    //===============================================
+    // 4. UI DISPLAY & NAVIGATION
+    //===============================================
+    
+    function showSearchPlaceholder() {
         sectionContent.style.display = 'none';
         searchResultsContainer.style.display = 'block';
-        searchResultsContainer.innerHTML = '';
+        searchResultsContainer.innerHTML = `<p class="welcome-message">Type a section number, title, or keyword to begin.</p>`;
+    }
+    
+    /**
+     * NEW: A dedicated function to show the "no results" message.
+     * @param {string} searchTerm The term for which no results were found.
+     */
+    function displayNoResultsMessage(searchTerm) {
+        sectionContent.style.display = 'none';
+        searchResultsContainer.style.display = 'block';
+        searchResultsContainer.innerHTML = `<p class="welcome-message">No results found for "<strong>${searchTerm}</strong>".</p>`;
+        isAllSectionsViewActive = false;
+    }
 
-        if (matches.length === 0) {
-            searchResultsContainer.innerHTML = `<p class="welcome-message">No results found for "<strong>${searchTerm}</strong>".</p>`;
-            return;
-        }
+    function displayAllSections() {
+        sectionContent.style.display = 'none';
+        searchResultsContainer.style.display = 'block';
+        searchResultsContainer.innerHTML = ''; 
 
-        matches.forEach(section => {
+        gstActData.forEach(section => {
             const resultItem = document.createElement('div');
             resultItem.className = 'search-result-item';
             resultItem.dataset.sectionNumber = section.section_number;
-
             const title = document.createElement('h3');
-            // We can get the chapter title from the data as well
             title.textContent = `Section ${section.section_number}: ${section.section_title}`;
-            
-            const snippet = document.createElement('p');
-            snippet.className = 'snippet';
-            
-            // Create a text snippet for context
-            const textContent = stripHtml(section.html_content);
-            const firstMatchIndex = textContent.search(searchRegex);
-            const excerptStart = Math.max(0, firstMatchIndex - 50);
-            const excerptEnd = Math.min(textContent.length, firstMatchIndex + 150);
-            let excerpt = textContent.substring(excerptStart, excerptEnd);
-            
-            // Highlight the term within the snippet
-            excerpt = excerpt.replace(searchRegex, `<mark class="highlight">$&</mark>`);
-
-            snippet.innerHTML = (excerptStart > 0 ? '...' : '') + excerpt + (excerptEnd < textContent.length ? '...' : '');
-
+            const badgeContainer = document.createElement('div');
+            badgeContainer.className = 'badge-container';
+            badgeContainer.innerHTML = `<span class="chapter-badge" title="Chapter ${section.chapter_number}: ${section.chapter_title}">Ch. ${section.chapter_number}</span>`;
+            title.appendChild(badgeContainer);
             resultItem.appendChild(title);
-            resultItem.appendChild(snippet);
-            
             resultItem.addEventListener('click', () => {
-                showSection(section.section_number, searchTerm);
+                showSection(section.section_number);
+                searchInput.value = '';
+                handleGlobalSearch(); // Restore the section view
                 if (window.innerWidth <= 900) closeMenu();
             });
+            searchResultsContainer.appendChild(resultItem);
+        });
+        
+        isAllSectionsViewActive = true; // Set the state
+    }
 
+    const displaySearchResults = (matches, rawSearchTerm, searchWords) => {
+        sectionContent.style.display = 'none';
+        searchResultsContainer.style.display = 'block';
+        searchResultsContainer.innerHTML = '';
+        isAllSectionsViewActive = false; // We are now showing ranked results, not the full list.
+
+        const isSingleWordQuery = searchWords.length === 1;
+
+        matches.forEach(({ section, score }) => {
+            const resultItem = document.createElement('div');
+            resultItem.className = 'search-result-item';
+            resultItem.dataset.sectionNumber = section.section_number;
+            const title = document.createElement('h3');
+            title.textContent = `Section ${section.section_number}: ${section.section_title}`;
+            const badgeContainer = document.createElement('div');
+            badgeContainer.className = 'badge-container';
+            badgeContainer.innerHTML = `
+                <span class="chapter-badge" title="Chapter ${section.chapter_number}: ${section.chapter_title}">Ch. ${section.chapter_number}</span>
+                <span class="score-badge" title="Search relevance score">Score: ${Math.round(score)}</span>`;
+            title.appendChild(badgeContainer);
+            const snippet = document.createElement('p');
+            snippet.className = 'snippet';
+            const firstWordMatch = section.textContent.search(isSingleWordQuery ? searchWords[0] : new RegExp(`\\b${searchWords[0]}\\b`));
+            const excerptStart = Math.max(0, firstWordMatch - 50);
+            const excerpt = section.textContent.substring(excerptStart, excerptStart + 200);
+            let highlightedSnippet = escapeRegExp(excerpt);
+            searchWords.forEach(word => {
+                const regexString = isSingleWordQuery ? `(${escapeRegExp(word)})` : `\\b(${escapeRegExp(word)})\\b`;
+                const highlightRegex = new RegExp(regexString, 'gi');
+                highlightedSnippet = highlightedSnippet.replace(highlightRegex, `<mark class="highlight">$1</mark>`);
+            });
+            snippet.innerHTML = (excerptStart > 0 ? '...' : '') + highlightedSnippet + '...';
+            resultItem.appendChild(title);
+            resultItem.appendChild(snippet);
+            resultItem.addEventListener('click', () => {
+                showSection(section.section_number, searchWords);
+                if (window.innerWidth <= 900) closeMenu();
+            });
             searchResultsContainer.appendChild(resultItem);
         });
     };
-    
-    // Add event listener to the search input, with a debounce to avoid searching on every keystroke
-    let searchTimeout;
-    searchInput.addEventListener('input', () => {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(handleGlobalSearch, 300); // 300ms delay
-    });
 
-    // --- NAVIGATION AND CONTENT DISPLAY LOGIC ---
-    const showSection = (sectionNumber, highlightTerm = null) => {
-        // Find the section data
+    const showSection = (sectionNumber, highlightWords = []) => {
         const sectionData = gstActData.find(s => s.section_number == sectionNumber);
         if (!sectionData) return;
+        
+        isAllSectionsViewActive = false; // A section is now active.
+        
+        let cleanHtml = new DOMParser().parseFromString(sectionData.html_content, 'text/html').body.innerHTML;
+        const isSingleWordQuery = highlightWords.length === 1;
 
-        // Clean the HTML from inline styles
-        let cleanHtml = sanitizeHtmlContent(sectionData.html_content);
-
-        // add the source URL if available in footer
-        if (sectionData.source_url) {
-            let footer = '<footer class="source-url">';
-            footer += `<p>Source: <a href="${sectionData.source_url}" target="_blank">${sectionData.source_url}</a></p>`;
-            footer += '</footer>';
-            cleanHtml += footer;
+        if (highlightWords.length > 0) {
+             highlightWords.forEach(word => {
+                const regexString = isSingleWordQuery ? `(${escapeRegExp(word)})` : `\\b(${escapeRegExp(word)})\\b`;
+                const regex = new RegExp(regexString, 'gi');
+                cleanHtml = cleanHtml.replace(regex, `<mark class="highlight">$1</mark>`);
+             });
         }
         
-        // If a search term was passed (from clicking a search result), highlight it
-        if (highlightTerm) {
-             const regex = new RegExp(`(${escapeRegExp(highlightTerm)})`, 'gi');
-             cleanHtml = cleanHtml.replace(regex, `<mark class="highlight">$1</mark>`);
-        }
-
-        // Display the content
         searchResultsContainer.style.display = 'none';
         sectionContent.style.display = 'block';
         sectionContent.innerHTML = cleanHtml;
         sectionContent.scrollTop = 0;
+        lastViewedContent = new DOMParser().parseFromString(sectionData.html_content, 'text/html').body.innerHTML;
         
-        // Update the last viewed content *without* highlights
-        lastViewedContent = sanitizeHtmlContent(sectionData.html_content);
-        
-        // Update the active link in the sidebar
         document.querySelectorAll('#chapter-nav a.active').forEach(el => el.classList.remove('active'));
         const activeLink = document.querySelector(`#chapter-nav a[data-section-number='${sectionNumber}']`);
         if (activeLink) {
             activeLink.classList.add('active');
-            // Optional: Ensure the chapter list is open
-            activeLink.closest('.section-list').classList.add('open');
-            activeLink.closest('.chapter-group').querySelector('.chapter-title').classList.add('open');
+            const sectionList = activeLink.closest('.section-list');
+            if (sectionList && !sectionList.classList.contains('open')) {
+                sectionList.classList.add('open');
+                sectionList.previousElementSibling.classList.add('open');
+            }
         }
     };
     
-    const openMenu = () => {
-        sidebar.classList.add('open');
-        overlay.style.display = 'block';
-    };
-
-    const closeMenu = () => {
-        sidebar.classList.remove('open');
-        overlay.style.display = 'none';
-    };
-
-    menuToggle.addEventListener('click', openMenu);
-    closeSidebar.addEventListener('click', closeMenu);
-    overlay.addEventListener('click', closeMenu);
-
     function buildNavigation(data) {
         const chapters = data.reduce((acc, section) => {
-            const { chapter_number, chapter_title, section_number, section_title } = section;
-            if (!acc[chapter_number]) {
-                acc[chapter_number] = { title: chapter_title, sections: [] };
-            }
-            // Pass more data to the section object
-            acc[chapter_number].sections.push({ number: section_number, title: section_title });
+            const { chapter_number, chapter_title, section_number } = section;
+            if (!acc[chapter_number]) acc[chapter_number] = { title: chapter_title, sections: [] };
+            acc[chapter_number].sections.push({ number: section_number });
             return acc;
         }, {});
 
@@ -1579,33 +1689,75 @@ document.addEventListener('DOMContentLoaded', () => {
             const sectionList = document.createElement('ul');
             sectionList.className = 'section-list';
             chapter.sections.sort((a, b) => a.number - b.number);
-
             chapter.sections.forEach(section => {
                 const li = document.createElement('li');
                 const a = document.createElement('a');
                 a.href = '#';
                 a.textContent = `Section ${section.number}`;
                 a.dataset.sectionNumber = section.number;
-
                 a.addEventListener('click', (e) => {
                     e.preventDefault();
-                    searchInput.value = ''; // Clear search when navigating from sidebar
-                    showSection(section.number); // Use the new centralized function
+                    searchInput.value = '';
+                    handleGlobalSearch();
+                    showSection(section.number);
                     if (window.innerWidth <= 900) closeMenu();
                 });
-
                 li.appendChild(a);
                 sectionList.appendChild(li);
             });
-
             chapterTitle.addEventListener('click', () => {
                 chapterTitle.classList.toggle('open');
                 sectionList.classList.toggle('open');
             });
-
             chapterGroup.appendChild(chapterTitle);
             chapterGroup.appendChild(sectionList);
             chapterNav.appendChild(chapterGroup);
         }
     }
+
+    //===============================================
+    // 5. EVENT LISTENERS & INITIALIZATION
+    //===============================================
+    
+    const openMenu = () => { sidebar.classList.add('open'); overlay.style.display = 'block'; };
+    const closeMenu = () => { sidebar.classList.remove('open'); overlay.style.display = 'none'; };
+    
+    menuToggle.addEventListener('click', openMenu);
+    closeSidebar.addEventListener('click', closeMenu);
+    overlay.addEventListener('click', closeMenu);
+
+    let searchTimeout;
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        // MODIFIED: Don't show placeholder if the "All Sections" list is already active.
+        if (searchInput.value.trim().length > 0 && searchInput.value.trim().length < 3) {
+            if (!isAllSectionsViewActive) {
+                showSearchPlaceholder();
+            }
+            return;
+        }
+        searchTimeout = setTimeout(handleGlobalSearch, 300);
+    });
+    
+    // MODIFIED: This listener now contains the primary interaction logic.
+    searchInput.addEventListener('focus', () => {
+        if (searchInput.value.trim() === '' && lastViewedContent.includes('class="welcome-message"')) {
+            // If starting from scratch, show the full list.
+            displayAllSections();
+        } else if (searchInput.value.trim() !== '') {
+            // If focusing a bar that already has text, run the search.
+            handleGlobalSearch();
+        }
+        // IMPORTANT: If focusing while a section is visible, we do nothing,
+        // allowing the user to start typing without the view changing.
+    });
+
+    searchInput.addEventListener('blur', () => {
+        if (searchInput.value.trim() === '') {
+            handleGlobalSearch(); // Reverts to the last viewed content.
+        }
+    });
+
+    // --- Initialize the application ---
+    buildNavigation(gstActData);
 });

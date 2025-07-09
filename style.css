@@ -281,6 +281,34 @@ mark.highlight {
     text-decoration: underline;
 }
 
+/* --- NEW: Container for multiple badges --- */
+.badge-container {
+    display: flex;
+    gap: 8px; /* Space between badges */
+    flex-shrink: 0; /* Prevent badges from shrinking */
+}
+
+/* --- NEW: Chapter Badge Style --- */
+.chapter-badge {
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    background-color: #eaf4ff; /* Lighter version of primary color */
+    padding: 3px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--primary-color);
+}
+
+.score-badge {
+    display: none; /* Hidden by default */
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: #fff;
+    background-color: #a4b0be;
+    padding: 3px 8px;
+    border-radius: 10px;
+}
+
 /* ================================================= */
 /* ===         MOBILE RESPONSIVE STYLES          === */
 /* ================================================= */
